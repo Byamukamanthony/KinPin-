@@ -1,0 +1,8 @@
+{
+  "name": "Kingpin",
+  "description": "The electric campus hub. Curated daily drops, gigs board, gossip feed, and ambassador earning console.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

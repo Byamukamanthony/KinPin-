@@ -1,0 +1,220 @@
+{
+  "entities": {
+    "user": {
+      "title": "User",
+      "description": "User profile with ambassador data",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "balance": { "type": "number" },
+        "referralCode": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email"]
+    },
+    "deal": {
+      "title": "Deal",
+      "description": "Exclusive daily drop campus deals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "discount": { "type": "string" },
+        "priceString": { "type": "string" },
+        "originalPriceString": { "type": "string" },
+        "description": { "type": "string" },
+        "image": { "type": "string" },
+        "location": { "type": "string" },
+        "claimsCount": { "type": "number" }
+      },
+      "required": ["id", "title", "discount", "priceString", "originalPriceString", "location"]
+    },
+    "dealClaim": {
+      "title": "Deal Claim",
+      "description": "Association tracking when a user claims a specific deal",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "dealId": { "type": "string" },
+        "claimedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "dealId", "claimedAt"]
+    },
+    "post": {
+      "title": "Post",
+      "description": "Gossip leak feed anonymous or verified post",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "avatar": { "type": "string" },
+        "relativeTime": { "type": "string" },
+        "category": { "type": "string" },
+        "tag": { "type": "string" },
+        "text": { "type": "string" },
+        "image": { "type": "string" },
+        "likesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "isHustleOffer": { "type": "boolean" },
+        "productTitle": { "type": "string" },
+        "productPrice": { "type": "string" },
+        "productDesc": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "username", "category", "likesCount", "commentsCount", "createdAt"]
+    },
+    "postLike": {
+      "title": "Post Like",
+      "description": "A like on a gossip feed post",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "postId": { "type": "string" },
+        "likedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "postId", "likedAt"]
+    },
+    "postComment": {
+      "title": "Post Comment",
+      "description": "A comment on a gossip feed post",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "postId": { "type": "string" },
+        "username": { "type": "string" },
+        "avatar": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "postId", "username", "text", "createdAt"]
+    },
+    "campusEvent": {
+      "title": "Campus Event",
+      "description": "Student party or creative hustle summits",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "location": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "image": { "type": "string" },
+        "isHottest": { "type": "boolean" },
+        "isVerified": { "type": "boolean" },
+        "verifiedLabel": { "type": "string" },
+        "priceString": { "type": "string" },
+        "priceSubLabel": { "type": "string" }
+      },
+      "required": ["id", "title", "location", "date", "time", "priceString"]
+    },
+    "eventRsvp": {
+      "title": "Event RSVP",
+      "description": "An RSVP to a campus event",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "eventId": { "type": "string" },
+        "registeredAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "eventId", "registeredAt"]
+    },
+    "product": {
+      "title": "Product",
+      "description": "Marketplace listing traded by students",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "priceString": { "type": "string" },
+        "priceNumber": { "type": "number" },
+        "image": { "type": "string" },
+        "location": { "type": "string" },
+        "category": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "whatsappNumber": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "priceString", "priceNumber", "location", "category", "whatsappNumber"]
+    },
+    "activity": {
+      "title": "Activity",
+      "description": "Referrals or commission actions of users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "dateStr": { "type": "string" },
+        "amount": { "type": "number" },
+        "direction": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title", "amount", "direction", "createdAt"]
+    },
+    "community": {
+      "title": "Community",
+      "description": "Student created or suggested interest groups/circles on campus",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "membersCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "category", "description", "createdBy", "membersCount", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "Profiles mapping to campus ambassador balances"
+    },
+    "/deals/{dealId}": {
+      "schema": "deal",
+      "description": "Discounts on campus"
+    },
+    "/dealClaims/{claimId}": {
+      "schema": "dealClaim",
+      "description": "Claims of campus deals"
+    },
+    "/posts/{postId}": {
+      "schema": "post",
+      "description": "Leaks and gossip submissions"
+    },
+    "/posts/{postId}/likes/{likeId}": {
+      "schema": "postLike",
+      "description": "Likes associated to posts"
+    },
+    "/posts/{postId}/comments/{commentId}": {
+      "schema": "postComment",
+      "description": "Comments left on posts"
+    },
+    "/events/{eventId}": {
+      "schema": "campusEvent",
+      "description": "Gigs and show credentials"
+    },
+    "/eventRsvps/{rsvpId}": {
+      "schema": "eventRsvp",
+      "description": "RSVPs for the event sessions"
+    },
+    "/products/{productId}": {
+      "schema": "product",
+      "description": "Items loaded under Peer-to-peer Marketplace"
+    },
+    "/activities/{activityId}": {
+      "schema": "activity",
+      "description": "Interactive transactions log"
+    },
+    "/communities/{communityId}": {
+      "schema": "community",
+      "description": "Real-time interest communities and group feeds on campus"
+    }
+  }
+}

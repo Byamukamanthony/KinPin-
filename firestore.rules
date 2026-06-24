@@ -1,0 +1,277 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------
+    // Global Helper Primitives
+    // -------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Admins list - managed securely under trusted document paths
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'anthonybyamukama111@gmail.com' ||
+        request.auth.token.email == 'anthonykuc8@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // -------------------------------------------------------------
+    // Match Rules for Collections
+    // -------------------------------------------------------------
+
+    // 1. User Profiles
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      // Only lists own profile to prevent query scraping
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isSignedIn() && 
+        isOwner(userId) &&
+        isValidId(userId) &&
+        incoming().userId == userId &&
+        incoming().email == request.auth.token.email &&
+        incoming().displayName is string && incoming().displayName.size() <= 80 &&
+        incoming().photoURL is string && incoming().photoURL.size() <= 300 &&
+        incoming().balance == 0 && // Enforce initial wallet starts at zero balance
+        incoming().referralCode is string && incoming().referralCode.size() <= 30 &&
+        incoming().createdAt is string && incoming().createdAt.size() <= 40;
+
+      // Withdrawals or alterations can only move balance downwards on client triggers to prevent self-inflation
+      allow update: if isSignedIn() && 
+        isOwner(userId) &&
+        incoming().userId == existing().userId &&
+        incoming().email == existing().email &&
+        incoming().referralCode == existing().referralCode &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().balance is number && (
+          incoming().balance <= existing().balance || // Balance cannot be self-inflated
+          isAdmin()
+        ) && 
+        incoming().diff(existing()).affectedKeys().hasOnly(['balance', 'displayName', 'photoURL']);
+
+      allow delete: if isAdmin();
+    }
+
+    // 2. Daily Discount Deals
+    match /deals/{dealId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      
+      // Allow atomic claimsCount increments
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          incoming().diff(existing()).affectedKeys().hasOnly(['claimsCount']) &&
+          incoming().claimsCount is number &&
+          incoming().claimsCount == existing().claimsCount + 1
+        )
+      );
+    }
+
+    // 3. Deal Claims Association
+    match /dealClaims/{claimId} {
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
+      
+      allow create: if isSignedIn() &&
+        isValidId(claimId) &&
+        claimId == request.auth.uid + '_' + incoming().dealId &&
+        incoming().userId == request.auth.uid &&
+        incoming().dealId is string && incoming().dealId.size() <= 80 &&
+        incoming().claimedAt is string && incoming().claimedAt.size() <= 40;
+    }
+
+    // 4. Gossip Feed Posts
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow delete: if isAdmin();
+      
+      allow create: if isSignedIn() &&
+        isValidId(postId) &&
+        incoming().id == postId &&
+        incoming().username is string && incoming().username.size() <= 80 &&
+        incoming().category is string && incoming().category.size() <= 60 &&
+        incoming().text is string && incoming().text.size() <= 2000 &&
+        incoming().likesCount == 0 &&
+        incoming().commentsCount == 0 &&
+        incoming().createdAt is string && incoming().createdAt.size() <= 40;
+
+      // Update limited strictly to named interaction increments
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          // Toggle Like post payload
+          (incoming().diff(existing()).affectedKeys().hasOnly(['likesCount']) &&
+           incoming().likesCount is number &&
+           (incoming().likesCount == existing().likesCount + 1 || incoming().likesCount == existing().likesCount - 1))
+          ||
+          // Add comment counter increment
+          (incoming().diff(existing()).affectedKeys().hasOnly(['commentsCount']) &&
+           incoming().commentsCount is number &&
+           incoming().commentsCount == existing().commentsCount + 1)
+        )
+      );
+
+      // Subcollection 4a: Likes associated with Posts
+      match /likes/{likeId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() &&
+          isValidId(likeId) &&
+          likeId == request.auth.uid + '_' + postId &&
+          incoming().userId == request.auth.uid &&
+          incoming().postId == postId &&
+          incoming().likedAt is string && incoming().likedAt.size() <= 40;
+        
+        allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      }
+
+      // Subcollection 4b: Comments associated with Posts
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() &&
+          isValidId(commentId) &&
+          incoming().id == commentId &&
+          incoming().postId == postId &&
+          incoming().username is string && incoming().username.size() <= 80 &&
+          incoming().text is string && incoming().text.size() <= 1000 &&
+          incoming().createdAt is string && incoming().createdAt.size() <= 40;
+        
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // 5. Gigs & Campus Events
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow delete: if isAdmin();
+      
+      allow create: if isSignedIn() &&
+        isValidId(eventId) &&
+        incoming().id == eventId &&
+        incoming().title is string && incoming().title.size() <= 100 &&
+        incoming().location is string && incoming().location.size() <= 100 &&
+        incoming().date is string && incoming().date.size() <= 50 &&
+        incoming().time is string && incoming().time.size() <= 50 &&
+        incoming().priceString is string && incoming().priceString.size() <= 40 &&
+        // Promoters forced to pending layout for activation fee auditing
+        incoming().status == 'pending' &&
+        incoming().isVerified == false &&
+        incoming().createdAt is string && incoming().createdAt.size() <= 40;
+
+      // Allowed updates: admin alters vetting, or student records RSVP flag
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          incoming().diff(existing()).affectedKeys().hasOnly(['attending'])
+        )
+      );
+    }
+
+    // 6. Event RSVPs
+    match /eventRsvps/{rsvpId} {
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
+      
+      allow create: if isSignedIn() &&
+        isValidId(rsvpId) &&
+        rsvpId == request.auth.uid + '_' + incoming().eventId &&
+        incoming().userId == request.auth.uid &&
+        incoming().eventId is string && incoming().eventId.size() <= 80 &&
+        incoming().registeredAt is string && incoming().registeredAt.size() <= 40;
+    }
+
+    // 7. Peer-to-peer Marketplace Products
+    match /products/{productId} {
+      allow read: if isSignedIn();
+      
+      allow create: if isSignedIn() &&
+        isValidId(productId) &&
+        incoming().id == productId &&
+        // Secure identification
+        incoming().userId == request.auth.uid &&
+        // Ensure initial listing is unverified and pending activation payment to protect campus students
+        incoming().isVerified == false &&
+        incoming().status == 'pending' &&
+        (incoming().whatsappNumber == '+256769624850' || incoming().whatsappNumber == '+256708682181') && // Anthony's central checkout trigger
+        incoming().title is string && incoming().title.size() <= 120 &&
+        incoming().priceString is string && incoming().priceString.size() <= 40 &&
+        incoming().location is string && incoming().location.size() <= 100 &&
+        incoming().category is string && incoming().category.size() <= 50 &&
+        incoming().createdAt is string && incoming().createdAt.size() <= 40;
+
+      allow update: if isAdmin();
+      
+      // Permit list owner to delete their product listings
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        isAdmin()
+      );
+    }
+
+    // 8. Financial / Referrals activities logs
+    match /activities/{activityId} {
+      // Direct isolation audit logs
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isSignedIn() &&
+        isValidId(activityId) &&
+        incoming().id == activityId &&
+        incoming().userId == request.auth.uid &&
+        incoming().title is string && incoming().title.size() <= 100 &&
+        incoming().amount is number &&
+        incoming().direction is string && incoming().direction.size() <= 10 &&
+        incoming().createdAt is string && incoming().createdAt.size() <= 40;
+
+      allow update, delete: if isAdmin();
+    }
+
+    // 9. Campus Communities & Hubs
+    match /communities/{communityId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        isValidId(communityId) &&
+        incoming().id == communityId &&
+        incoming().name is string && incoming().name.size() <= 80 &&
+        incoming().category is string && incoming().category.size() <= 40 &&
+        incoming().description is string && incoming().description.size() <= 500 &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().membersCount == 1 &&
+        incoming().createdAt is string && incoming().createdAt.size() <= 40;
+
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          // Allow increments of membersCount
+          incoming().diff(existing()).affectedKeys().hasOnly(['membersCount']) &&
+          incoming().membersCount is number &&
+          (incoming().membersCount == existing().membersCount + 1 || incoming().membersCount == existing().membersCount - 1)
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+  }
+}
